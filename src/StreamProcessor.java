@@ -58,7 +58,9 @@ public class StreamProcessor {
 		try {
 			Statement st = conn.createStatement();
 			for(String s: _symbolTable.keySet()){
-				st.executeUpdate("drop table "+ s.toUpperCase());
+				if(_symbolTable.get(s).get_varType().compareTo("sensorcollection") == 0){
+					st.executeUpdate("drop table "+ s.toUpperCase());
+				}
 			}
 			st.close();
 		} catch (SQLException e) {
@@ -262,8 +264,22 @@ public class StreamProcessor {
 			result = window.toString();
 		}else{
 			String[] attributes = tokens[1].split(",");
-			result = "";
-			
+			StringBuilder res = new StringBuilder("{");
+			for(Observation o : window){
+				for(String s : attributes){
+					try {
+						res.append(s + " : " + o.getClass().getField(s).get(o).toString() + ",");
+					} catch (IllegalArgumentException | IllegalAccessException | NoSuchFieldException
+							| SecurityException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+				res.setLength(res.length() - 1);
+				res.append("}\n");
+			}
+			result = res.toString();
+			System.out.println(result);
 		}
 		return result;
 	}
@@ -301,6 +317,7 @@ public class StreamProcessor {
 					    }
 					}
 					String result = processWindow(window, tokens, tok);
+					break;
 					//empty top slideValue obs from window, 
 					//set tuplesReadSoFarCount -= slideValue
 				}
