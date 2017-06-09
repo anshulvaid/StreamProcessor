@@ -13,15 +13,19 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.stream.*;
+import java.time.temporal.ChronoUnit;
 
 public class StreamProcessor {
 	private Map<String,VariableCollection> _symbolTable;
@@ -180,7 +184,8 @@ public class StreamProcessor {
 					return null;
 				}, Collectors.counting()));
 				
-				System.out.println(ret.toString());
+				//System.out.println(ret.toString());
+				result = ret.toString();
 			}else{
 				result = "{ count: " + String.valueOf(window.size()) + "}";
 			}
@@ -216,7 +221,7 @@ public class StreamProcessor {
 						return null;
 					}, Collectors.minBy(comp)));
 					result = ret.toString();
-					System.out.println(result);
+					//System.out.println(result);
 				}
 			}else{
 				Optional<Observation> ret = window.stream().collect(Collectors.minBy(comp));
@@ -254,7 +259,7 @@ public class StreamProcessor {
 						return null;
 					}, Collectors.maxBy(comp)));
 					result = ret.toString();
-					System.out.println(result);
+					//System.out.println(result);
 				}
 			}else{
 				Optional<Observation> ret = window.stream().collect(Collectors.maxBy(comp));
@@ -279,7 +284,7 @@ public class StreamProcessor {
 				res.append("}\n");
 			}
 			result = res.toString();
-			System.out.println(result);
+			//System.out.println(result);
 		}
 		return result;
 	}
@@ -303,8 +308,8 @@ public class StreamProcessor {
 			List<String> validSensorIds = new ArrayList<String>();
 			if(rangeUnit.toLowerCase().compareTo("tuples") == 0){
 				int tuplesReadSoFarCount = 0;
+				List<Observation> window = new ArrayList<Observation>();
 				while(true){
-					List<Observation> window = new ArrayList<Observation>();
 					while (tuplesReadSoFarCount < rangeValue && (line = br.readLine()) != null) {
 	
 					    // use comma as separator
@@ -317,21 +322,65 @@ public class StreamProcessor {
 					    }
 					}
 					String result = processWindow(window, tokens, tok);
-					break;
-					//empty top slideValue obs from window, 
-					//set tuplesReadSoFarCount -= slideValue
+					System.out.println(result);
+					if(slideValue == -1 || line == null){
+						break;
+					}else{
+						if(slideValue <= rangeValue){
+							tuplesReadSoFarCount -= slideValue;
+							window.subList(0, slideValue).clear();
+						}
+					}
 				}
+				br.close();
+			}else if(rangeUnit.toLowerCase().compareTo("minutes") == 0){
+				String startTime = "6/6/2017 09:54:18";
+				DateTimeFormatter formatter = DateTimeFormatter.ofPattern("M/d/yyyy HH:mm:ss");
+				LocalDateTime dt = LocalDateTime.parse(startTime, formatter);
+				
+				List<Observation> window = new ArrayList<Observation>();
+				while(true){
+					while ((line = br.readLine()) != null) {
+	
+					    // use comma as separator
+					    String[] obs = line.split(",");
+					    Observation o = new Observation(obs);
+					    LocalDateTime tupleTime = LocalDateTime.parse(o.timestamp, formatter);
+					    if(ChronoUnit.SECONDS.between(dt, tupleTime) > rangeValue*60){
+					    	break;
+					    }
+					    if(validSensorIds.contains(o.sensor_id) || validTuple(o,tableName)){
+					    	window.add(o);
+					    	validSensorIds.add(o.sensor_id);
+					    }
+					}
+					String result = processWindow(window, tokens, tok);
+					System.out.println(result);
+					if(slideValue == -1 || line == null){
+						break;
+					}else{
+						if(slideValue <= rangeValue){
+							for (Iterator<Observation> iterator = window.iterator(); iterator.hasNext();) {
+							    Observation obs = iterator.next();
+							    LocalDateTime tupleTime = LocalDateTime.parse(obs.timestamp, formatter);
+							    if (ChronoUnit.SECONDS.between(dt, tupleTime) <= slideValue*60) {
+							        // Remove the current element from the iterator and the list.
+							        iterator.remove();
+							    }else{
+							    	break;
+							    }
+							}
+							dt = LocalDateTime.parse(window.get(0).timestamp, formatter);
+						}
+					}
+				}
+				br.close();
 			}
 			
 		} catch (Exception e) {
 			e.printStackTrace();
 			cleanUp();
 			closeConnection();
-		}
-		if(rangeUnit.toLowerCase().compareTo("minutes") == 0){
-			
-		}else {
-			
 		}
 		return returnValue;
 	}
@@ -346,53 +395,6 @@ public class StreamProcessor {
 			_symbolTable.put(tokens[i], vc);
 		}
 	}
-	
-//	public List<Map<String, String>> selection(String[] tokens, int offset, List<String> tableNames, boolean aliased, boolean join, Map<String, String> alias){
-//		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
-//		List<String> attributes = new ArrayList<String>();
-//		for(String s : tableNames){
-////			attributes.addAll(getAttributes(s));
-//		}
-//		return result;
-//	}
-//	
-//	public List<Map<String, String>> query(String[] tokens, int offset){
-//		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
-//		boolean star = false, join = false, aliased = false;
-//		Map<String, String> alias = new HashMap<String, String>();
-//		List<String> attributes = new ArrayList<String>();
-//		List<String> tableNames = new ArrayList<String>();
-//		int i=offset +1;
-//		if(tokens[offset + 1] == "*"){
-//			star = true;
-//			i++;
-//		}else{
-//			while(tokens[i].toLowerCase() != "from"){
-//				attributes.add(tokens[i++]);
-//			}
-//		}
-//		if(tokens[i++].toLowerCase() == "from"){
-//			while(i<tokens.length && tokens[i].toLowerCase() != "where"){
-//				if(tokens[i].toLowerCase() == "sensor" || tokens[i].toLowerCase() == "infrastructure" || _symbolTable.containsKey(tokens[i])){
-//					tableNames.add(tokens[i]);
-//				}else{
-//					aliased = true;
-//					alias.put(tokens[i], tokens[i-1]);
-//				}
-//				i++;
-//			}
-//			if(tableNames.size() > 1){
-//				join = true;
-//			}
-//			if(tokens[i].toLowerCase() == "where"){
-//				result = selection(tokens, ++i, tableNames, aliased, join, alias);
-//			}
-//		}else{
-//			System.out.println("Error: Incorrect Query format");
-//			result = null;
-//		}
-//		return result;
-//	}
 	
 	public int assignment(String[] tokens){
 		String varName = tokens[0];
