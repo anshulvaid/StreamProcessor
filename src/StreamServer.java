@@ -414,6 +414,10 @@ public class StreamServer {
     		if(symbolTable.get(varName).get_varType() == "sensorcollection"){
     			try {
     				Statement s = conn.createStatement();
+    				ResultSet tables = conn.getMetaData().getTables(null, null, varName.toUpperCase()+clientId, null);
+					if(tables.next())
+						s.executeUpdate("drop table " + varName+ clientId);
+					tables.close();
     				s.addBatch("create table " + varName +clientId +" as " + tokens[1]+ " with no data");
     				s.addBatch("insert into " + varName + clientId + " " + tokens[1]);
     				s.executeBatch();
