@@ -43,7 +43,7 @@ public class StreamServer {
                 stmt.execute("CREATE TABLE sensor(\n"
                         + "  id VARCHAR(50) NOT NULL PRIMARY KEY\n"
                         + ", description VARCHAR(50)\n"
-                        + ", name VARCHAR(50)\n"
+                        + ", sensorName VARCHAR(50)\n"
                         + ", sensorIP VARCHAR(50)\n"
                         + ", sensorPort VARCHAR(10)\n"
                         + ", COVERAGE_ID VARCHAR(10)\n"
@@ -51,13 +51,14 @@ public class StreamServer {
                         + ", USER_ID VARCHAR(10)\n"
                         + ", PLATFORM_ID VARCHAR(10)\n"
                         + ", sensor_type_id VARCHAR(5)\n"
+                        + ", sensorLocation VARCHAR(30)\n"
                         + ")");
                 // insert data
                 BufferedReader br = new BufferedReader(new FileReader(new File("sensors.csv")));
                 String line;
-                PreparedStatement pstmt = conn.prepareStatement("INSERT INTO sensor(id, description, name,"
-                		+"sensorIP, sensorPort, COVERAGE_ID, LOCATION_ID, USER_ID, PLATFORM_ID,sensor_type_id)"
-                		+"VALUES (?,?,?,?,?,?,?,?,?,?)");
+                PreparedStatement pstmt = conn.prepareStatement("INSERT INTO sensor(id, description, sensorName,"
+                		+"sensorIP, sensorPort, COVERAGE_ID, LOCATION_ID, USER_ID, PLATFORM_ID,sensor_type_id,sensorLocation)"
+                		+"VALUES (?,?,?,?,?,?,?,?,?,?,?)");
                 while((line = br.readLine()) != null){
         			String[] entries = line.split(",");
         			pstmt.setString(1, entries[0]);
@@ -70,6 +71,7 @@ public class StreamServer {
         			pstmt.setString(8, entries[7]);
         			pstmt.setString(9, entries[8]);
         			pstmt.setString(10, entries[9]);
+        			pstmt.setString(11, entries[10]);
         			pstmt.execute();
         		}
                 br.close();
@@ -82,22 +84,24 @@ public class StreamServer {
                 Statement stmt = conn.createStatement();
                 stmt.execute("CREATE TABLE infrastructure(\n"
                         + "  name VARCHAR(20)\n"
-                        + ", type VARCHAR(20)\n"
+                        + ", location VARCHAR(20)\n"
                         + ", SEMANTIC_ENTITY_ID VARCHAR(10)\n"
                         + ", REGION_ID VARCHAR(5)\n"
+                        + ", floor VARCHAR(5)\n"
                         + ")");
                 // insert data
                 BufferedReader br = new BufferedReader(new FileReader(new File("infra.csv")));
                 String line;
                 PreparedStatement pstmt = conn.prepareStatement("INSERT INTO infrastructure(name,"
-                		+"type, SEMANTIC_ENTITY_ID, REGION_ID)"
-                		+"VALUES (?,?,?,?)");
+                		+"location, SEMANTIC_ENTITY_ID, REGION_ID, floor)"
+                		+"VALUES (?,?,?,?,?)");
                 while((line = br.readLine()) != null){
         			String[] entries = line.split(",");
         			pstmt.setString(1, entries[0]);
         			pstmt.setString(2, entries[1]);
         			pstmt.setString(3, entries[2]);
         			pstmt.setString(4, entries[3]);
+        			pstmt.setString(5, entries[4]);
         			pstmt.execute();
         		}
                 br.close();
@@ -380,7 +384,8 @@ public class StreamServer {
     							    	break;
     							    }
     							}
-    							dt = LocalDateTime.parse(window.get(0).timestamp, formatter);
+    							if(!window.isEmpty())
+    								dt = LocalDateTime.parse(window.get(0).timestamp, formatter);
     						}
     					}
     				}
@@ -389,6 +394,7 @@ public class StreamServer {
     			
     		} catch (Exception e) {
     			e.printStackTrace();
+    			out.println("Exception occured.");
     			cleanUp();
     		}
     		return returnValue;
@@ -426,6 +432,7 @@ public class StreamServer {
     				out.println("Assignment Query executed successfully.");
     			} catch (SQLException e) {
     				e.printStackTrace();
+    				out.println("Exception occured.");
     				cleanUp();
     			}
     		}else if(symbolTable.get(varName).get_varType() == "observationstream"){
@@ -479,6 +486,7 @@ public class StreamServer {
                 }
             } catch (IOException | SQLException e) {
                 e.printStackTrace();
+                out.println("Exception occured.");
             } finally {
                 try {
                 	cleanUp();
