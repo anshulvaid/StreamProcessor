@@ -235,12 +235,17 @@ public class StreamServer {
     						}
     						return null;
     					}, Collectors.minBy(comp)));
-    					result.append(ret.toString());
+    					Map<String, Observation> res = new HashMap<String, Observation>();
+    					for(Object o : ret.keySet()){
+    						if(ret.get(o).isPresent())
+    							res.put((String)o, ret.get(o).get());
+    					}
+    					result.append(res.toString());
     					//System.out.println(result);
     				}
     			}else{
     				Optional<Observation> ret = window.stream().collect(Collectors.minBy(comp));
-    				result.append(ret.isPresent()? ret.toString():"");
+    				result.append(ret.isPresent()? ret.get().toString():"");
     			}
     		}else if(tokens[1].toLowerCase().contains("max")){
     			String aggCol = tokens[1].substring(tokens[1].indexOf("(")+1, tokens[1].indexOf(")"));
@@ -273,12 +278,16 @@ public class StreamServer {
     						}
     						return null;
     					}, Collectors.maxBy(comp)));
-    					result.append(ret.toString());
-    					//System.out.println(result);
+    					Map<String, Observation> res = new HashMap<String, Observation>();
+    					for(Object o : ret.keySet()){
+    						if(ret.get(o).isPresent())
+    							res.put((String)o, ret.get(o).get());
+    					}
+    					result.append(res.toString());
     				}
     			}else{
     				Optional<Observation> ret = window.stream().collect(Collectors.maxBy(comp));
-    				result.append(ret.isPresent()? ret.toString():"");
+    				result.append(ret.isPresent()? ret.get().toString():"");
     			}
     		}else if(tokens[1].compareTo("*") == 0){
     			result.append(window.toString());
@@ -354,12 +363,13 @@ public class StreamServer {
     				
     				List<Observation> window = new ArrayList<Observation>();
     				while(true){
+    					LocalDateTime tupleTime = null;
     					while ((line = br.readLine()) != null) {
     	
     					    // use comma as separator
     					    String[] obs = line.split(",");
     					    Observation o = new Observation(obs);
-    					    LocalDateTime tupleTime = LocalDateTime.parse(o.timestamp, formatter);
+    					    tupleTime = LocalDateTime.parse(o.timestamp, formatter);
     					    if(ChronoUnit.SECONDS.between(dt, tupleTime) > rangeValue*60){
     					    	break;
     					    }
@@ -368,15 +378,18 @@ public class StreamServer {
     					    	validSensorIds.add(o.sensor_id);
     					    }
     					}
-    					String result = processWindow(window, tokens, tok);
-    					out.println(result);
+    					String result = "";
+    					if(!window.isEmpty())
+    						result = processWindow(window, tokens, tok);
+    					if(result != null && !result.isEmpty())
+    						out.println(result);
     					if(slideValue == -1 || line == null){
     						break;
     					}else{
     						if(slideValue <= rangeValue){
     							for (Iterator<Observation> iterator = window.iterator(); iterator.hasNext();) {
     							    Observation obs = iterator.next();
-    							    LocalDateTime tupleTime = LocalDateTime.parse(obs.timestamp, formatter);
+    							    tupleTime = LocalDateTime.parse(obs.timestamp, formatter);
     							    if (ChronoUnit.SECONDS.between(dt, tupleTime) <= slideValue*60) {
     							        // Remove the current element from the iterator and the list.
     							        iterator.remove();
@@ -386,6 +399,8 @@ public class StreamServer {
     							}
     							if(!window.isEmpty())
     								dt = LocalDateTime.parse(window.get(0).timestamp, formatter);
+    							else
+    								dt = tupleTime;
     						}
     					}
     				}
@@ -406,9 +421,10 @@ public class StreamServer {
     		if(tokens[offset].toLowerCase().compareTo("sensorcollection") == 0){
     			varType = "sensorcollection";
     		}
-    		for(int i=offset+1; i<tokens.length; i++){
-    			VariableCollection vc = new VariableCollection(tokens[i], varType);
-    			symbolTable.put(tokens[i], vc);
+    		String[] variables = tokens[offset+1].split(",");
+    		for(String s : variables){
+    			VariableCollection vc = new VariableCollection(s, varType);
+    			symbolTable.put(s, vc);
     		}
     		out.println("Variable defined of type: " + varType);
     	}
